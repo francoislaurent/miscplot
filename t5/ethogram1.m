@@ -89,18 +89,6 @@ if strcmpi(stimulus_onset, 'none')
     stimulus_onset = [];
 elseif isempty(stimulus_onset)
     p = m.ethogramme_data.protocol;
-    function ss=cut(s, sep)
-        _seps = find(s == sep);
-        if isempty(_seps)
-            ss = {s};
-        else
-            ss = {s(1:_seps(1)-1)};
-            for _s = 1:numel(_seps)-1
-                ss{end+1} = s(_seps(_s)+1:_seps(_s+1)-1);
-            end%for
-            ss{end+1} = s(_seps(end)+1:end);
-        end%if
-    end%function
     stims = cut(p, '#');
     stimulus_onset = [];
     for _s = 1:numel(stims)
@@ -181,15 +169,6 @@ else
 end%if
 
 nbehaviors = size(behavior,1);
-function attr = to_attr(b)
-    global behavior
-    global suffix
-    if isempty(suffix)
-        attr = behavior{b,1};
-    else
-        attr = [behavior{b,1}, '_', suffix];
-    end%if
-end%function
 no_state = size(behavior,1) + 1;
 trials = {};
 for e = 1:numel(m.ethogramme)
@@ -422,5 +401,28 @@ if ~isempty(max_time_from_onset)
     xlim([-max_time_from_onset(1), max_time_from_onset(2)])
 end%if
 ylim([0, y0])
+
+% nested functions
+function attr = to_attr(b)
+    global behavior
+    global suffix
+    if isempty(suffix)
+        attr = behavior{b,1};
+    else
+        attr = [behavior{b,1}, '_', suffix];
+    end%if
+end%function
+function ss=cut(s, sep)
+    _seps = find(s == sep);
+    if isempty(_seps)
+        ss = {s};
+    else
+        ss = {s(1:_seps(1)-1)};
+        for _s = 1:numel(_seps)-1
+            ss{end+1} = s(_seps(_s)+1:_seps(_s+1)-1);
+        end%for
+        ss{end+1} = s(_seps(end)+1:end);
+    end%if
+end%function
 
 end%function
