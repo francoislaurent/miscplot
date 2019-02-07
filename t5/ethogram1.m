@@ -43,8 +43,6 @@ no_response = 'show';
 exclude = {};
 o_color = 'm';
 o_linewidth = 2;
-global behavior
-global suffix
 behavior = {};
 %    'hunch_large',  'blue';
 %    'cast_large',   'red';
@@ -67,8 +65,6 @@ for v = 1:2:nargin-1
             end_tol = varargin{v+1};
         case 'behavior'
             behavior = varargin{v+1};
-        case 'suffix'
-            suffix = varargin{v+1};
         case 'fillgaps'
             fill_gaps = varargin{v+1};
         case 'level'
@@ -91,12 +87,14 @@ elseif isempty(stimulus_onset)
     p = m.ethogramme_data.protocol;
     stims = cut(p, '#');
     stimulus_onset = [];
-    for _s = 1:numel(stims)
-        if strcmp(stims{_s}, 'n')
+    for s_ = 1:numel(stims)
+        if strcmp(stims{s_}, 'n')
             break
         end%if
-        specs = cut(stims{_s}, '_'){end};
-        onset = cut(specs, 's'){1};
+        specs = cut(stims{s_}, '_');
+        specs = specs{end};
+        onset = cut(specs, 's');
+        onset = onset{1};
         stimulus_onset(end+1) = str2num(onset);
     end%for
 end%if
@@ -104,28 +102,28 @@ if isempty(behavior)
     trial = m.ethogramme(1);
     behaviors = fieldnames(trial);
     matched = false(size(behaviors));
-    larva_behavior = {
-        'hunch',  [0,0,1];
-        'cast',   [1,0,0];
-        'back',   [0,1,1];
-        'stop',   [0,1,0];
-        'run',    [0,0,0];
+    larva_behavior = { ...
+        'hunch',  [0,0,1]; ...
+        'cast',   [1,0,0]; ...
+        'back',   [0,1,1]; ...
+        'stop',   [0,1,0]; ...
+        'run',    [0,0,0]; ...
         'roll',   [1,1,0]};
     behavior = cell(0, 2);
     for b = 1:size(larva_behavior,1)
         matches = find(strncmp(larva_behavior{b,1}, behaviors, numel(larva_behavior{b,1})));
-        for _m = 1:numel(matches)
-            behavior(end+1,:) =...
-                {behaviors{matches(_m)}, larva_behavior{b,2}/_m};
+        for m_ = 1:numel(matches)
+            behavior(end+1,:) = ...
+                {behaviors{matches(m_)}, larva_behavior{b,2}/m_};
         end%for
         matched(matches) = 1;
     end%for
     unmatched = find(~matched);
-    for _m = 1:numel(unmatched)
+    for m_ = 1:numel(unmatched)
         extra_color = rand(1, 3);
-        extra_color *= .9 / sqrt(sum(extra_color .* extra_color));
-        behavior(end+1,:) =...
-            {behaviors{unmatched(_m)}, extra_color};
+        extra_color = extra_color .* (.9 / sqrt(sum(extra_color .* extra_color)));
+        behavior(end+1,:) = ...
+            {behaviors{unmatched(m_)}, extra_color};
     end%for
 end%if
 if isscalar(max_time_from_onset)
@@ -152,19 +150,19 @@ else
         exclude = {1, exclude};
     end%if
     for e1 = 1:size(exclude,1)
-        _exclude = exclude{e1,2};
-        for e2 = 1:numel(_exclude)
-            if strcmpi(_exclude{e2}, 'none')
-                _exclude{e2} = -1;
+        exclude_ = exclude{e1,2};
+        for e2 = 1:numel(exclude_)
+            if strcmpi(exclude_{e2}, 'none')
+                exclude_{e2} = -1;
             else
-                _e = find(strcmp(_exclude{e2}, behavior(:,1)));
-                if isempty(_e)
-                    error(['no such behavior: ', _exclude{e2}])
+                e_ = find(strcmp(exclude_{e2}, behavior(:,1)));
+                if isempty(e_)
+                    error(['no such behavior: ', exclude_{e2}])
                 end%if
-                _exclude{e2} = _e;
+                exclude_{e2} = e_;
             end%if
         end%for
-        exclude{e1,2} = [_exclude{:}];
+        exclude{e1,2} = [exclude_{:}];
     end%for
 end%if
 
@@ -175,7 +173,7 @@ for e = 1:numel(m.ethogramme)
     trial = m.ethogramme(e);
     states = fieldnames(trial);
     for b = 1:nbehaviors
-        empty = isempty(trial.(to_attr(b)));
+        empty = isempty(trial.(behavior{b,1}));
         if ~empty
             break
         end%if
@@ -187,7 +185,7 @@ for e = 1:numel(m.ethogramme)
     Npost = zeros(1, nbehaviors);
     X = {};
     for b = 1:nbehaviors
-        ts = trial.(to_attr(b));
+        ts = trial.(behavior{b,1});
         if isempty(stimulus_onset)
             N(b) = numel(ts);
             for t = 1:numel(ts)
@@ -199,21 +197,21 @@ for e = 1:numel(m.ethogramme)
             N(b) = numel(ts);
             for t = 1:numel(ts)
                 x = ts(t).x([2,3]);
-                x -= stimulus_onset(1);
+                x = x - stimulus_onset(1);
                 if -onset_tol(1)<=x(1)
-                    Npost(b) += 1;
+                    Npost(b) = Npost(b) + 1;
                 end%if
                 X{end+1} = x;
             end%for
         else
             for t = 1:numel(ts)
                 x = ts(t).x([2,3]);
-                x -= stimulus_onset(1);
+                x = x - stimulus_onset(1);
                 if -max_time_from_onset(1)<x(2) && x(1)<max_time_from_onset(2)
-                    N(b) += 1;
+                    N(b) = N(b) + 1;
                     X{end+1} = x;
                     if -onset_tol(1)<=x(1)
-                        Npost(b) += 1;
+                        Npost(b) = Npost(b) + 1;
                     end%if
                 end%if
             end%for
@@ -258,7 +256,7 @@ else
         end%if
         % first (new) state after onset and its end time
         candidate_first_at_onset = find(-onset_tol(1) <= s_onsets);
-        [_i, best] = min(abs(s_onsets(candidate_first_at_onset)));
+        [i_, best] = min(abs(s_onsets(candidate_first_at_onset)));
         first_post_onset = candidate_first_at_onset(best);
         if ~isempty(first_post_onset)
             s_onset = s_onsets(first_post_onset);
@@ -288,19 +286,19 @@ else
         for s = 1:numel(states)
             states(s) = find(states(s) <= N, 1);
         end%for
-        _continue = false;
+        continue_ = false;
         for e1 = 1:size(exclude,1)
             level = exclude{e1,1};
-            _exclude = exclude{e1,2};
+            exclude_ = exclude{e1,2};
             if level <= numel(states)
-                if any(_exclude==states(level))
-                    _continue = true; break
+                if any(exclude_==states(level))
+                    continue_ = true; break
                 end%if
-            elseif any(_exclude==-1)
-                _continue = true; break
+            elseif any(exclude_==-1)
+                continue_ = true; break
             end%if
         end%for
-        if _continue
+        if continue_
             continue
         end%if
         if numel(states) < n_levels
@@ -313,31 +311,23 @@ else
     order = {};
     if n_levels == 1
         for g = 1:size(group,2)
-            [_stops, _order] = sort(stops{1,g});
-            order{end+1} = group{1,g}(_order(end:-1:1));
+            [stops_, order_] = sort(stops{1,g});
+            order{end+1} = group{1,g}(order_(end:-1:1));
         end%for
         if no_response
             for g = size(group,2):-1:1
-                [_stops, _order] = sort(stops{2,g});
-                order{end+1} = group{2,g}(_order);
+                [stops_, order_] = sort(stops{2,g});
+                order{end+1} = group{2,g}(order_);
             end%for
         end%if
     else
-        function _m=subgroup(_m, c, g)
-            _s = size(_m);
-            _m = _m(c,g,:);
-            if 3 < numel(_s)
-                _s = _s(3:end);
-                _m = permute(reshape(_m, _s), numel(_s):-1:1);
-            end%if
-        end%function
         for g = 1:size(group,2)
             subgroup_stops = subgroup(stops, 1, g);
             subgroup_group = subgroup(group, 1, g);
             for h = 1:numel(subgroup_group)
                 if ~isempty(subgroup_group{h})
-                    [_stops, _order] = sort(subgroup_stops{h});
-                    order{end+1} = subgroup_group{h}(_order(end:-1:1));
+                    [stops_, order_] = sort(subgroup_stops{h});
+                    order{end+1} = subgroup_group{h}(order_(end:-1:1));
                 end%if
             end%for
         end%for
@@ -347,8 +337,8 @@ else
                 subgroup_group = subgroup(group, 2, g);
                 for h = numel(subgroup_group):-1:1
                     if ~isempty(subgroup_group{h})
-                        [_stops, _order] = sort(subgroup_stops{h});
-                        order{end+1} = subgroup_group{h}(_order);
+                        [stops_, order_] = sort(subgroup_stops{h});
+                        order{end+1} = subgroup_group{h}(order_);
                     end%if
                 end%for
             end%for
@@ -374,11 +364,11 @@ for t = 1:ntrials
             vertices{b}{end+1,1} = x([1,1,2,2], k);
             vertices{b}{end,2} = [y-dy; y; y; y-dy];
             faces{b}{end+1,1} = f(b)+1:f(b)+4;
-            k += 1;
-            f(b) += 4;
+            k = k + 1;
+            f(b) = f(b) + 4;
         end%for
     end%for
-    y -= dy;
+    y = y - dy;
 end%for
 
 for b = 1:nbehaviors
@@ -403,25 +393,24 @@ end%if
 ylim([0, y0])
 
 % nested functions
-function attr = to_attr(b)
-    global behavior
-    global suffix
-    if isempty(suffix)
-        attr = behavior{b,1};
-    else
-        attr = [behavior{b,1}, '_', suffix];
-    end%if
-end%function
 function ss=cut(s, sep)
-    _seps = find(s == sep);
-    if isempty(_seps)
+    seps_ = find(s == sep);
+    if isempty(seps_)
         ss = {s};
     else
-        ss = {s(1:_seps(1)-1)};
-        for _s = 1:numel(_seps)-1
-            ss{end+1} = s(_seps(_s)+1:_seps(_s+1)-1);
+        ss = {s(1:seps_(1)-1)};
+        for s_ = 1:numel(seps_)-1
+            ss{end+1} = s(seps_(s_)+1:seps_(s_+1)-1);
         end%for
-        ss{end+1} = s(_seps(end)+1:end);
+        ss{end+1} = s(seps_(end)+1:end);
+    end%if
+end%function
+function m_=subgroup(m_, c, g)
+    s_ = size(m_);
+    m_ = m_(c,g,:);
+    if 3 < numel(s_)
+        s_ = s_(3:end);
+        m_ = permute(reshape(m_, s_), numel(s_):-1:1);
     end%if
 end%function
 
