@@ -1,7 +1,7 @@
 
 function m = ethogram1(m, varargin)
 %ETHOGRAM1   Plot ethogram.
-%   DATA_STRUCT=ETHOGRAM1(DATA_FILE_OR_STRUCT, KEY1, VAR1, ...)
+%   DATA_STRUCT=ETHOGRAM1(DATA_FILE_OR_STRUCT, KEY1, VALUE1, ...)
 %   DATA_STRUCT is a structure with an 'ethogramme' field and optionally a
 %   'ethogramme_data' field.
 %   The 'ethogramme' field is an array of structures with behavior names as fields.
