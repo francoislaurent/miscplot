@@ -25,6 +25,7 @@ function varargout=bar2(y, varargin)
 %   'LegendWidth': relative width of the squares in the legend
 %   'LegendTextWidth': relative width of the space dedicated to text
 %       in the legend
+%   'LegendFontSize': font size of text elements in the legend
 
 % parse args
 firstarg = 1;
@@ -44,6 +45,7 @@ legend = {};
 legendlocation = 'topright';
 lg_relative_width = .5;
 lg_relative_text_width = 3;
+lg_font_size = [];
 for a = firstarg:2:nargin-1
     switch lower(varargin{a})
     case 'facecolor'
@@ -64,6 +66,8 @@ for a = firstarg:2:nargin-1
         lg_relative_width = varargin{a+1};
     case 'legendtextwidth'
         lg_relative_text_width = varargin{a+1};
+    case 'legendfontsize'
+        lg_font_size = varargin{a+1};
     end%switch
 end%for
 if ~iscell(facecolor)
@@ -71,6 +75,10 @@ if ~iscell(facecolor)
 end%if
 if ~iscell(edgecolor)
     edgecolor = {edgecolor};
+end%if
+text_prop = {'VerticalAlignment', 'baseline'};
+if ~isempty(lg_font_size)
+    text_prop = [text_prop, {'FontSize', lg_font_size}];
 end%if
 
 sz = size(y);
@@ -180,7 +188,7 @@ if ~isempty(legend)
             end%if
         end%for
         k = k + 1;
-        text_h(end+1) = text(lg_x(k), lg_y, legend{i}, 'VerticalAlignment', 'baseline');
+        text_h(end+1) = text(lg_x(k), lg_y, legend{i}, text_prop{:});
     end%for
 end%if
 

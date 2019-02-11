@@ -32,12 +32,15 @@ end%for
 
 % plot
 figure();
+set(gca, 'FontSize', 18)
 bar2(100 * table, ...
     'FaceColor', colors, 'EdgeColor', repmat(colors(1,:),size(colors,1),1), ...
     'LineWidth', 2, ...
     'Legend', cellfun(@(s)[num2str(s) 's'], window_sizes(:,2), 'UniformOutput', false), ...
-    'LegendWidth', .9, 'LegendTextWidth', 2);
+    'LegendWidth', .9, 'LegendTextWidth', 3, 'LegendFontSize', 14);
 
 set(gca, 'XTickLabel', {'crawl', 'bend', 'stop', 'hunch', 'back-up'})
 ylabel('Behavioral probability (%)')
 
+pause(1)
+print('histogram1.svg')

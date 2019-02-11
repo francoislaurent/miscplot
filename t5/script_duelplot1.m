@@ -22,7 +22,7 @@ duel = {'hunch bend',   c('hunch bend',a1),     c('hunch bend',a2); ...
     'back-up hunch',    c('back-up hunch',a1),  c('back-up hunch',a2)};
 
 marker_size = 14;
-font_size = 14;
+font_size = 18;
 
 %
 function s_ = capitalize(s)
@@ -79,6 +79,7 @@ for d = 1:size(duel,1)
     xlabel([capitalize(x_behavior) ' probability (%)'])
     ylabel([capitalize(y_behavior) ' probability (%)'])
 
+    pause(1)
     print(['duel_' x_behavior '_' y_behavior '.svg'])
 
 end%for
