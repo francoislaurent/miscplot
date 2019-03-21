@@ -1,7 +1,7 @@
 
-function m = ethogram2(m, stimulus_onset, varargin)
+function order = ethogram2(m, stimulus_onset, varargin)
 %ETHOGRAM2   Plot ethogram.
-%   DATA_STRUCT=ETHOGRAM2(DATA_FILE_OR_STRUCT, STIMULUS_ONSET, KEY1, VALUE1, ...)
+%   ORDER=ETHOGRAM2(DATA_FILE_OR_STRUCT, STIMULUS_ONSET, KEY1, VALUE1, ...)
 %   DATA_STRUCT is a structure with an 'ethogramme' field and optionally a
 %   'ethogramme_data' field.
 %   STIMULUS_ONSET is a scalar or array of stimulus onset times in seconds.
@@ -21,6 +21,9 @@ function m = ethogram2(m, stimulus_onset, varargin)
 %       by behavior ordering
 %   'NoResponse': if is 'hide', then trials which response to stimulus happens more
 %       then MaxTimeFromOnset after onset are not plotted
+%   'Include': cell array of the response behaviors to be plotted;
+%       the first column is response level (from 1 to 'Level'), the second column is
+%       a behavior or cell array of behaviors; undefined behavior is 'none'
 %   'Exclude': cell array of response behaviors not to be plotted;
 %       the first column is response level (from 1 to 'Level'), the second column is
 %       a behavior or cell array of behaviors; undefined behavior is 'none'
@@ -40,6 +43,7 @@ end_tol = 0; % seconds
 fill_gaps = 0; % 0 or 1
 n_levels = 1;
 no_response = 'show';
+include = {};
 exclude = {};
 o_color = 'm';
 o_linewidth = 2;
@@ -52,6 +56,7 @@ behavior = {};
 %    'roll_large',   'yellow';
 %    'small_motion', [26, 26, 26] / 256};
 suffix = '';%'squares';
+ymin = []; ymax = [];
 
 for v = 1:2:nargin-2
     switch lower(varargin{v})
@@ -71,12 +76,20 @@ for v = 1:2:nargin-2
             n_levels = varargin{v+1};
         case 'noresponse'
             no_response = varargin{v+1};
+        case 'include'
+            include = varargin{v+1};
         case 'exclude'
             exclude = varargin{v+1};
         case 'linecolor'
             o_color = varargin{v+1};
         case 'linewidth'
             o_linewidth = varargin{v+1};
+        case 'ymin'
+            ymin = varargin{v+1};
+        case 'ymax'
+            ymax = varargin{v+1};
+        otherwise
+            warning(['unknown argument: '''+varargin{v}+''''])
     end%switch
 end%for
 
@@ -117,37 +130,10 @@ end%if
 if isscalar(onset_tol)
     onset_tol = [0, onset_tol];
 end%if
+n_stims = numel(stimulus_onset);
 no_response = ~any(strcmpi(no_response, {'hide', 'none'}));
-if isempty(exclude)
-    exclude = cell(0,2); % just make sure first dimension is null
-else
-    if ~iscell(exclude)
-        exclude = {1, {exclude}};
-    elseif size(exclude,2) == 2 && isnumeric(exclude{1})
-        for e = 1:size(exclude,1)
-            if ~iscell(exclude{e,2})
-                exclude{e,2} = exclude(e,2);
-            end%if
-        end%for
-    else
-        exclude = {1, exclude};
-    end%if
-    for e1 = 1:size(exclude,1)
-        exclude_ = exclude{e1,2};
-        for e2 = 1:numel(exclude_)
-            if strcmpi(exclude_{e2}, 'none')
-                exclude_{e2} = -1;
-            else
-                e_ = find(strcmp(exclude_{e2}, behavior(:,1)));
-                if isempty(e_)
-                    error(['no such behavior: ', exclude_{e2}])
-                end%if
-                exclude_{e2} = e_;
-            end%if
-        end%for
-        exclude{e1,2} = [exclude_{:}];
-    end%for
-end%if
+include = format_exp(include, behavior, n_stims, n_levels);
+exclude = format_exp(exclude, behavior, n_stims, n_levels);
 
 if isempty(stimulus_onset)
     error('no stimulus onset defined')
@@ -214,7 +200,6 @@ for e = 1:numel(m.ethogramme)
     trials{2,end} = X;
 end%for
 
-n_stims = numel(stimulus_onset);
 ntrials = size(trials,2);
 if n_levels == 0 || isempty(stimulus_onset)
     order = 1:ntrials;
@@ -285,16 +270,13 @@ else
             end%if
             for s = 1:numel(sn_states)
                 sn_states(s) = find(sn_states(s) <= N, 1);
-            end%for
-            for e1 = 1:size(exclude,1)
-                level = exclude{e1,1};
-                exclude_ = exclude{e1,2};
-                if level <= numel(sn_states)
-                    if any(exclude_==sn_states(level))
-                        continue_ = true; break
-                    end%if
-                elseif any(exclude_==-1)
-                    continue_ = true; break
+                if ~(isempty(include{n,s}) || any(sn_states(s) == include{n,s}))
+                    continue_ = true;
+                    break
+                end%if
+                if ~isempty(exclude{n,s}) && any(sn_states(s) == exclude{n,s})
+                    continue_ = true;
+                    break
                 end%if
             end%for
             if continue_
@@ -342,8 +324,18 @@ if isempty(order)
 end%if
 
 ntrials = numel(order);
-y0 = ntrials; dy = 1;
-y = y0;
+if isempty(ymax)
+    if isempty(ymin)
+        ymin = 0;
+        ymax = ntrials;
+    else
+        ymax = ymin + ntrials;
+    end%if
+elseif isempty(ymin)
+    ymin = ymax - ntrials;
+end%if
+dy = 1;
+y = ymax;
 f = zeros(1, nbehaviors);
 faces = cell(1, nbehaviors);
 vertices = cell(1, nbehaviors);
@@ -378,17 +370,70 @@ for b = 1:nbehaviors
     end%if
 end%for
 
-for o = 1:numel(stimulus_onset)
-    x0 = relative_onset(o);
-    plot([x0, x0], [0, y0], '-', 'Color', o_color, 'LineWidth', o_linewidth);
-end%for
+ylim_ = [min(0, ymin), ymax];
+if o_color ~= 'none' && 0 < o_linewidth
+    for o = 1:numel(stimulus_onset)
+        x0 = relative_onset(o);
+        plot([x0, x0], ylim_, '-', 'Color', o_color, 'LineWidth', o_linewidth);
+    end%for
+end%if
 
 if ~isempty(max_time_from_onset)
     xlim([-max_time_from_onset(1), stimulus_max_interval+max_time_from_onset(2)])
 end%if
-ylim([0, y0])
+ylim(ylim_)
 
 % nested functions
+function expr_=format_exp(expr, behavior, n_stims, n_levels)
+    expr_ = cell(n_stims, n_levels);
+    if ~isempty(expr)
+        if ~iscell(expr)
+            [expr_{:}] = deal({expr});
+        elseif isnumeric(expr{1})
+            if ~any(size(expr,2)==[2,3])
+                error('wrong size')
+            end%if
+            for e = 1:size(expr,1)
+                if ~iscell(expr{e,end})
+                    expr{e,end} = expr(e,end);
+                end%if
+            end%for
+            [expr_{:}] = deal({});
+            if size(expr,2) == 2
+                if n_levels == 1 || n_stims == 1
+                    for e = 1:size(expr,1)
+                        expr_{expr{e,1}} = [expr_{expr{e,1}}, expr{e,2}];
+                    end%for
+                else
+                    error('wrong size')
+                end%if
+            elseif size(expr,2) == 3
+                for e = 1:size(expr,1)
+                    expr_{expr{e,1},expr{e,2}} = [expr_{expr{e,1},expr{e,2}}, expr{e,3}];
+                end%for
+            else
+                error('wrong size')
+            end%if
+        else
+            [expr_{:}] = deal(expr);
+        end%if
+        for e1 = 1:numel(expr_)
+            expr__ = expr_{e1};
+            for e2 = 1:numel(expr__)
+                if strcmpi(expr__{e2}, 'none')
+                    expr__{e2} = -1;
+                else
+                    e_ = find(strcmp(expr__{e2}, behavior(:,1)));
+                    if isempty(e_)
+                        error(['no such behavior: ', expr__{e2}])
+                    end%if
+                    expr__{e2} = e_;
+                end%if
+            end%for
+            expr_{e1} = [expr__{:}];
+        end%for
+    end%if
+end%function
 function ss=cut(s, sep)
     seps_ = find(s == sep);
     if isempty(seps_)

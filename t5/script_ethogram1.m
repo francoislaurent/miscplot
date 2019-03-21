@@ -37,5 +37,5 @@ m = ethogram1(ethogram, ...
 xlabel('Time from stimulus onset (s)')
 ylabel('Number of animals')
 
-print('control.svg')
+print('-depsc', 'control.eps')
 close

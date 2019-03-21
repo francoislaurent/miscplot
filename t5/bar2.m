@@ -36,6 +36,7 @@ else
     y = varargin{firstarg};
     firstarg += 1;
 end%if
+dn = 2;
 facecolor = 'b';
 edgecolor = 'k';
 facealpha = 1;
@@ -48,6 +49,8 @@ lg_relative_text_width = 3;
 lg_font_size = [];
 for a = firstarg:2:nargin-1
     switch lower(varargin{a})
+    case 'interval'
+        dn = varargin{a+1};
     case 'facecolor'
         facecolor = varargin{a+1};
     case 'edgecolor'
@@ -106,7 +109,6 @@ end%if
 if isempty(x)
     m = sz(2); n = sz(1);
     dx = .5;
-    dn = 2;
     width = 1 / ((1+dx) * (n+dn));
     iid = width * (1+dx);
     xgrid = 0:iid:iid*(n-1)+eps;

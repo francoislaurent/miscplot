@@ -59,4 +59,4 @@ set(gca, 'YTickLabel', yticklabel)
 xlabel('Time from stimulus onset (s)')
 
 pause(1)
-print('ethogram2.svg', '-S480,960')
+print('-depsc', 'ethogram2.eps', '-S480,960')

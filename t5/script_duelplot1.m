@@ -80,6 +80,6 @@ for d = 1:size(duel,1)
     ylabel([capitalize(y_behavior) ' probability (%)'])
 
     pause(1)
-    print(['duel_' x_behavior '_' y_behavior '.svg'])
+    print('-depsc', ['duel_' x_behavior '_' y_behavior '.eps'])
 
 end%for

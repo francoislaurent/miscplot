@@ -43,4 +43,5 @@ set(gca, 'XTickLabel', {'crawl', 'bend', 'stop', 'hunch', 'back-up'})
 ylabel('Behavioral probability (%)')
 
 pause(1)
-print('histogram1.svg')
+print('-depsc', 'histogram1.eps')
+

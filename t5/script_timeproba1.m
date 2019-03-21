@@ -39,6 +39,6 @@ set(gca, 'XTick', [0, 20, 40])
 xlabel('Time from stimulus onset (s)')
 ylabel('Behavioral probability (%)')
 
-print('timeproba1.svg')
+print('-depsc', 'timeproba1.eps')
 close
 

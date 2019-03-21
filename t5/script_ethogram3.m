@@ -32,6 +32,6 @@ for d = 1:size(dirs,1)
     xlabel('Time from stimulus onset (s)')
     ylabel('Number of animals')
 
-    print([dir_(1:end-1),'.svg'])
+    print('-depsc', [dir_(1:end-1),'.eps'])
     close
 end%for d
