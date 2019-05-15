@@ -89,7 +89,7 @@ for v = 1:2:nargin-2
         case 'ymax'
             ymax = varargin{v+1};
         otherwise
-            warning(['unknown argument: '''+varargin{v}+''''])
+            warning(['unknown argument: ''' varargin{v} ''''])
     end%switch
 end%for
 
@@ -234,7 +234,10 @@ else
             sn_onsets = s_onsets - relative_onset(n);
             sn_stops = s_stops - relative_onset(n);
             % first (new) state after onset and its end time
-            candidate_first_at_onset = find(-onset_tol(1) <= sn_onsets);
+            candidate_first_at_onset = find((0 <= sn_onsets) & (sn_onsets <= onset_tol(2)));
+            if isempty(candidate_first_at_onset)
+                candidate_first_at_onset = find(-onset_tol(1) <= sn_onsets);
+            end%if
             [i_, best] = min(abs(sn_onsets(candidate_first_at_onset)));
             first_post_onset = candidate_first_at_onset(best);
             if ~isempty(first_post_onset)
