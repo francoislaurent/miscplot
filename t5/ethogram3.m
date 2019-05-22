@@ -19,9 +19,12 @@ event_min_response_time = 0;
 event_max_response_time = 0;
 event_transitions_only = false;
 grouping = {};
-sort_by = {'onset=1,end'};
+sort_by = 'onset=1,end';
 fill_gaps = 0; % boolean
 ymin = []; ymax = [];
+first_onset_as_origin = false;
+event_onset_color = 'm';
+event_onset_linewidth = 0;
 
 for v = 1:2:nargin-2
     switch lower(varargin{v})
@@ -55,6 +58,12 @@ for v = 1:2:nargin-2
         ymin = varargin{v+1};
     case 'ymax'
         ymax = varargin{v+1};
+    case 'firstonsetasorigin'
+        first_onset_as_origin = varargin{v+1};
+    case 'eventonsetcolor'
+        event_onset_color = varargin{v+1};
+    case 'eventonsetlinewidth'
+        event_onset_linewidth = varargin{v+1};
     otherwise
         warning(['unknown argument: ''' varargin{v} ''''])
     end%switch
@@ -337,8 +346,10 @@ else
                 elseif ~event_transitions_only(e)
                     x1 = x(j,end_col) - (event_onset_time(e)+event_min_response_time);
                     candidate = j(find(-event_onset_tolerance < x1, 1)); % x0s are ordered, so as x1s
-                    b = x(candidate,bhr_col);
-                    events{t,e}(end+1,:) = {[b, 0], candidate};
+                    if any(candidate)
+                        b = x(candidate,bhr_col);
+                        events{t,e}(end+1,:) = {[b, 0], candidate};
+                    end%if
                 end%if
             end%for
     end%for
@@ -347,7 +358,7 @@ else
         criteria{e}{end,2} = 1:nbehaviors;%1:numel(event_onset_time);
         if ~event_transitions_only(e)
             criteria{e}{end+1,1} = 'transition';
-            criteria{e}{end,2} = [0,1];
+            criteria{e}{end,2} = [1,0];
         end%if
     end%for
     clear x x0 j js
@@ -374,6 +385,7 @@ if ~isempty(event_type)
                 for k=1:size(events_t{e},1)
                     js = events_t{e}{k,2};
                     if isempty(js)
+                        warning('internal error: undefined events not cleared')
                         continue
                     end%if
                     % assert size(js,2)==1
@@ -538,7 +550,11 @@ if ~isempty(grouping)
                         for e=1:size(events_,2)
                             evts_ = events_{t,e};
                             for k=1:size(evts_,1)
-                                s_ = evts_{k,2}(2)+cursor;
+                                s_ = evts_{k,2};
+                                if ~isempty(event_type)
+                                    s_ = s_(2);
+                                end%if
+                                s_ = s_ +cursor;
                                 if 0<s_ && s_<=size(trials{t},1)
                                     b_ = trials{t}(s_,bhr_col);
                                     group__{b_}(end+1,1) = t;
@@ -633,7 +649,11 @@ if ~isempty(sort_by)
             evt_ = zeros(0,1);
             for e=1:size(events_,2)
                 if ~isempty(events_{t,e})
-                    evt_ = [evt_; cell2mat(events_{t,e}(:,2))(:,2)];
+                    evt__ = cell2mat(events_{t,e}(:,2));
+                    if ~isempty(event_type)
+                        evt__ = evt__(:,2);
+                    end%if
+                    evt_ = [evt_; evt__];
                 end%if
             end%for
             if isempty(evt_)
@@ -682,8 +702,13 @@ if isempty(ymax)
 elseif isempty(ymin)
     ymin = ymax - ntrials;
 end%if
+x0 = 0;
+if first_onset_as_origin
+    x0 = event_onset_time(1);
+end%if
 dy = 1;
-y = ymax;
+y0 = ymax;
+y = y0;
 f = zeros(1, nbehaviors);
 faces = cell(1, nbehaviors);
 vertices = cell(1, nbehaviors);
@@ -693,7 +718,7 @@ for t = 1:ntrials
     z = trials{order(t)};
     for k=1:size(z,1)
         b = z(k,bhr_col);
-        x = z(k,[begin_col,end_col])';
+        x = z(k,[begin_col,end_col])' - x0;
         vertices{b}{end+1,1} = x([1 1 2 2]);
         vertices{b}{end,2} = [y-dy; y; y; y-dy];
         faces{b}{end+1,1} = f(b)+1:f(b)+4;
@@ -714,6 +739,16 @@ for b = 1:nbehaviors
         hold on
     end%if
 end%for
+
+if ~strcmpi(event_onset_color, 'none') && 0<event_onset_linewidth
+    for o = 1:numel(event_onset_time)
+        x0 = event_onset_time(o);
+        if first_onset_as_origin
+            x0 = x0 - event_onset_time(1);
+        end%if
+        plot([x0, x0], [0, y0], '-', 'Color', event_onset_color, 'LineWidth', event_onset_linewidth);
+    end%for
+end%if
 
 function filters=parse_filters(str_)
     filters = strsplit(str_, ';');
