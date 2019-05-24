@@ -345,7 +345,7 @@ else
                     end%if
                 elseif ~event_transitions_only(e)
                     x1 = x(j,end_col) - (event_onset_time(e)+event_min_response_time);
-                    candidate = j(find(-event_onset_tolerance < x1, 1)); % x0s are ordered, so as x1s
+                    candidate = j(find(((event_onset_tolerance+event_max_response_time-event_min_response_time) <= x1) & (x0 <= -event_onset_tolerance), 1)); % x0s are ordered, so as x1s
                     if any(candidate)
                         b = x(candidate,bhr_col);
                         events{t,e}(end+1,:) = {[b, 0], candidate};
@@ -896,7 +896,7 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
         error('wrong size for events')
     end%if
     if isempty(groups_)
-        groups_ = {1:ntrials_};
+        groups_ = {reshape(1:ntrials_,ntrials_,1)};
     end%if
     %if 1 < nevts_ % only for EventType
     %    if size(filters_,2) ~= nevts_
@@ -907,6 +907,7 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
     %        end%if
     %    end%if
     %end%if
+    event_type_defined = any(strcmp('type', criteria{1}(:,1))); % workaround
     for f_=1:numel(filters_)
         filter_ = filters_{f_};
         equalsign_ = strfind(filter_, '=');
@@ -914,11 +915,15 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
             error('malformed expression')
         end%if
         feature_ = filter_(1:equalsign_-1);
-        value_ = str2num(filter_(equalsign_+1:end));
+        value_ = filter_(equalsign_+1:end);
         if strcmp(feature_, 'onset')
+            value_ = str2num(value_);
             events_ = events_(:, value_); % select column or make the other columns empty?
         elseif strncmp(feature_, 'state', 5)
             value_ = find(strcmp(value_,behavior_description(:,1)));
+            if isempty(value_)
+                error('no state defined')
+            end%if
             cursor_ = [];
             if 5 < numel(feature_)
                 if ~( feature_(6) == '(' && feature_(end) == ')' )
@@ -932,19 +937,23 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
             if false%cursor_ == 0
                 for i_=1:numel(groups_)
                     for b_=[1:value_-1,value_+1,nbhvrs_]
-                        for t_=groups_{i_}
+                        for t_=groups_{i_}'
                             events_{t_,e_} = cell(0,2);
                         end%for
                     end%for
                 end%for
             else
                 for i_=1:numel(groups_)
-                    for t_=groups_{i_}
+                    for t_=groups_{i_}'
                         for e_=1:size(events_,2)
                             evts_ = events_{t_,e_};
                             select_ = false(size(evts_,1),1);
                             for k_=1:size(evts_,1)
-                                s_ = evts_{k_,2}(2)+cursor_;
+                                s_ = evts_{k_,2};
+                                if event_type_defined
+                                    s_ = s_(2);
+                                end%if
+                                s_ = s_ + cursor_;
                                 if 0<s_ && s_<=size(trials_{t_})
                                     b_ = trials_{t_}(s_,bhr_col);
                                     select_(k_) = b_ == value_;
