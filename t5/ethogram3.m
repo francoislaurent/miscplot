@@ -1,4 +1,4 @@
-function order=ethogram3(m, varargin)
+function [order, varargout]=ethogram3(m, varargin)
 %ETHOGRAM3   Plot ethogram.
 %   ORDER=ETHOGRAM3(DATA_FILE_OR_STRUCT, KEY1, VALUE1, ...)
 
@@ -25,6 +25,7 @@ ymin = []; ymax = [];
 first_onset_as_origin = false;
 event_onset_color = 'm';
 event_onset_linewidth = 0;
+return_group_counts = false;
 
 for v = 1:2:nargin-2
     switch lower(varargin{v})
@@ -64,6 +65,8 @@ for v = 1:2:nargin-2
         event_onset_color = varargin{v+1};
     case 'eventonsetlinewidth'
         event_onset_linewidth = varargin{v+1};
+    case 'returngroupcounts'
+        return_group_counts = varargin{v+1};
     otherwise
         warning(['unknown argument: ''' varargin{v} ''''])
     end%switch
@@ -101,7 +104,6 @@ end%for
 ntrials = numel(m);
 nbehaviors = size(behavior_description,1);
 trials = cell(ntrials, nbehaviors);
-trial_defined = true(ntrials,1);
 for t=1:ntrials
     for b=1:nbehaviors
         t0t1 = cell(0,1);
@@ -117,6 +119,7 @@ for t=1:ntrials
     end%for
 end%for
 clear m N t0t1
+trial_defined = ~all(cellfun(@isempty,trials),2);
 trials = trials(trial_defined,:);
 ntrials = size(trials,1)
 original_trial_index = find(trial_defined);
@@ -319,39 +322,39 @@ else
     events = cell(ntrials,numel(event_onset_time));
     [events{:}] = deal(cell(0,2));
     for t=1:size(trials,1)
-            x = trials{t};
-            if isempty(x)
-                %error('missing states')
-                continue
+        x = trials{t};
+        if isempty(x)
+            %error('missing states')
+            continue
+        end%if
+        j = 1:size(x,1);
+        for e=1:numel(event_onset_time)
+            x0 = x(j,begin_col) - (event_onset_time(e)+event_min_response_time);
+            if event_onset_tolerance
+                candidate = (0 <= x0) & (x0 <= event_onset_tolerance);
+                if ~any(candidate)
+                    candidate = (-event_onset_tolerance <= x0) & (x0 <= (event_onset_tolerance+event_max_response_time-event_min_response_time));
+                end%if
+            else
+                candidate = (0 <= x0) & (x0 <= (event_max_response_time-event_min_response_time));
             end%if
-            j = 1:size(x,1);
-            for e=1:numel(event_onset_time)
-                x0 = x(j,begin_col) - (event_onset_time(e)+event_min_response_time);
-                if event_onset_tolerance
-                    candidate = (0 <= x0) & (x0 <= event_onset_tolerance);
-                    if ~any(candidate)
-                        candidate = (-event_onset_tolerance <= x0) & (x0 <= (event_onset_tolerance+event_max_response_time-event_min_response_time));
-                    end%if
+            if any(candidate)
+                candidate = j(find(candidate, 1));
+                b = x(candidate,bhr_col);
+                if event_transitions_only(e)
+                    events{t,e}(end+1,:) = {b, candidate};
                 else
-                    candidate = (0 <= x0) & (x0 <= (event_max_response_time-event_min_response_time));
+                    events{t,e}(end+1,:) = {[b, 1], candidate};
                 end%if
-                if any(candidate)
-                    candidate = j(find(candidate, 1));
+            elseif ~event_transitions_only(e)
+                x1 = x(j,end_col) - (event_onset_time(e)+event_min_response_time);
+                candidate = j(find(((event_onset_tolerance+event_max_response_time-event_min_response_time) <= x1) & (x0 <= -event_onset_tolerance), 1)); % x0s are ordered, so as x1s
+                if ~isempty(candidate)
                     b = x(candidate,bhr_col);
-                    if event_transitions_only(e)
-                        events{t,e}(end+1,:) = {b, candidate};
-                    else
-                        events{t,e}(end+1,:) = {[b, 1], candidate};
-                    end%if
-                elseif ~event_transitions_only(e)
-                    x1 = x(j,end_col) - (event_onset_time(e)+event_min_response_time);
-                    candidate = j(find(((event_onset_tolerance+event_max_response_time-event_min_response_time) <= x1) & (x0 <= -event_onset_tolerance), 1)); % x0s are ordered, so as x1s
-                    if any(candidate)
-                        b = x(candidate,bhr_col);
-                        events{t,e}(end+1,:) = {[b, 0], candidate};
-                    end%if
+                    events{t,e}(end+1,:) = {[b, 0], candidate};
                 end%if
-            end%for
+            end%if
+        end%for
     end%for
     for e=1:numel(criteria)
         criteria{e}{end+1,1} = 'state';%'onset'
@@ -362,7 +365,11 @@ else
         end%if
     end%for
     clear x x0 j js
-    [events{find(any(cellfun(@isempty,events),2)),:}] = deal(cell(0,2));
+    if 1<size(events,2)
+        discard = any(cellfun(@isempty,events),2);
+        [events{find(discard),:}] = deal(cell(0,2));
+        %ntrials - sum(discard)
+    end%if
 end%if
 
 % event type
@@ -506,7 +513,7 @@ end%if
 group = {reshape(1:ntrials,ntrials,1)};
 if ~isempty(grouping)
     if ~iscell(grouping)
-        grouping = strsplit(grouping, ';');
+        grouping = {grouping};%strsplit(grouping, ';');
     end%if
     G = numel(grouping);
     for g=1:G
@@ -518,12 +525,15 @@ if ~isempty(grouping)
             end%for
         end%if
         for h=1:numel(grouping{g})
-        events_ = events;
-        if 1 < numel(grouping{g}{h})
-            events_ = apply_filters(grouping{g}{h}(1:end-1), events_, trials, group, behavior_description, bhr_col, criteria);
-        end%if
-        gh = grouping{g}{h}{end};
-        if strncmp(gh, 'state', 5)
+        [events_, gh] = apply_filters(grouping{g}{h}, events, trials, group, behavior_description, bhr_col, criteria);
+        discard = any(cellfun(@isempty,events_),2);
+        [events_{find(discard),:}] = deal(cell(0,2));
+        %ntrials - sum(discard)
+        if isempty(gh)
+            for i=1:numel(group)
+                new_group{end+1,1} = group{i}(~discard(group{i}));
+            end%for
+        elseif strncmp(gh, 'state', 5)
             cursor = [];
             if 5 < numel(gh)
                 if ~( gh(6) == '(' && gh(end) == ')' )
@@ -537,7 +547,6 @@ if ~isempty(grouping)
             if false%cursor == 0
                 for i=1:numel(group)
                     for e=1:size(events_,2)
-                        [i,e]
                         new_group(end+1,1) = group{i}(~cellfun(@isempty, events_(group{i},e), 'UniformOutput', true));
                         new_group{end}
                     end%for
@@ -546,7 +555,7 @@ if ~isempty(grouping)
                 for i=1:numel(group)
                     %group{i} = reshape(group{i},numel(group{i}),1);
                     group__ = cell(nbehaviors,1);
-                    for t=group{i}'
+                    for t=group{i}(~discard(group{i}))'
                         for e=1:size(events_,2)
                             evts_ = events_{t,e};
                             for k=1:size(evts_,1)
@@ -574,18 +583,15 @@ if ~isempty(grouping)
             for i=1:numel(group)
                 %group{i} = reshape(group{i},numel(group{i}),1);
                 group__ = cell(numel(F),1);
-                for e=1:size(events_,2)
-                    F = criteria{e}{feature,2};
-                    for t=group{i}'
+                for t=group{i}(~discard(group{i}))'
+                    for e=1:size(events_,2)
                         evts_ = events_{t,e};
-                        if isempty(evts_)
-                            continue
-                        end%if
                         K = size(evts_,1);
                         f = zeros(K,1);
                         for k=1:K
                             f(k) = evts_{k,1}(feature);
                         end%for
+                        F = criteria{e}{feature,2};
                         for f_=1:numel(F)
                             if any(F(f_)==f)
                                 group__{f_}(end+1,1) = t;
@@ -605,13 +611,10 @@ if ~isempty(sort_by)
     sort_by = strsplit(sort_by, ';');
     for s=1:numel(sort_by)
     sort_by_ = strsplit(sort_by{s}, ',');
-    if 1 < numel(sort_by_)
-        events_ = apply_filters(sort_by_(1:end-1), events, trials, group, behavior_description, bhr_col, criteria);
-    end%if
+    [events_, sort_by_] = apply_filters(sort_by_, events, trials, group, behavior_description, bhr_col, criteria);
     if 1 < size(events_,2)
         warning('SortBy should select a single event onset')
     end%if
-    sort_by_ = sort_by_{end};
     sort_by_ = strsplit(sort_by_, '.');
     s_ = sort_by_{1};
     cursor = [];
@@ -673,6 +676,7 @@ if ~isempty(sort_by)
     end%for
     end%for
 end%if
+group_counts = cellfun(@numel, group);
 order = cell2mat(group);
 if any(diff(sort(order))==0)
     warning('duplicate trials')
@@ -748,6 +752,12 @@ if ~strcmpi(event_onset_color, 'none') && 0<event_onset_linewidth
         end%if
         plot([x0, x0], [0, y0], '-', 'Color', event_onset_color, 'LineWidth', event_onset_linewidth);
     end%for
+end%if
+
+nout = 1;
+if return_group_counts
+    varargout{nout} = group_counts;
+    nout = nout + 1;
 end%if
 
 function filters=parse_filters(str_)
@@ -888,8 +898,19 @@ function discard=apply_filter(filter, x)
     discard = ~union;
 end%function
 
-function events_=apply_filters(filters_, events_, trials_, groups_, behavior_description, bhr_col, criteria)
-    % only for Grouping and SortBy
+function [events_, target_]=apply_filters(filters_, events_, trials_, groups_, behavior_description, bhr_col, criteria)
+    % only for Grouping and SortBy.
+    % discard the last filter if not an (in-)equality
+    target_ = filters_{end};
+    if any(target_=='=')% || any(target_=='<') || any(target_=='>') % inequalities not supported yet
+        target_ = '';
+    else
+        filters_ = filters_(1:end-1);
+        if isempty(filters_)
+            return
+        end%if
+    end%if
+    %
     ntrials_ = size(trials_,1);
     [ntrials__, nevts_] = size(events_);
     if ntrials_ ~= ntrials__
@@ -936,7 +957,7 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
             end%if
             if false%cursor_ == 0
                 for i_=1:numel(groups_)
-                    for b_=[1:value_-1,value_+1,nbhvrs_]
+                    for b_=[1:value_-1,value_+1:nbhvrs_]
                         for t_=groups_{i_}'
                             events_{t_,e_} = cell(0,2);
                         end%for
@@ -947,6 +968,9 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
                     for t_=groups_{i_}'
                         for e_=1:size(events_,2)
                             evts_ = events_{t_,e_};
+                            if isempty(evts_)
+                                continue
+                            end%if
                             select_ = false(size(evts_,1),1);
                             for k_=1:size(evts_,1)
                                 s_ = evts_{k_,2};
@@ -954,7 +978,7 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
                                     s_ = s_(2);
                                 end%if
                                 s_ = s_ + cursor_;
-                                if 0<s_ && s_<=size(trials_{t_})
+                                if 0<s_ && s_<=size(trials_{t_},1)
                                     b_ = trials_{t_}(s_,bhr_col);
                                     select_(k_) = b_ == value_;
                                 end%if
@@ -966,10 +990,14 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
             end%if
         else
             feature_ = find(strcmp(feature_, criteria{1}(:,1))); % workaround
+            value_ = str2num(value_);
             for i_=1:numel(groups_)
                 for t_=groups_{i_}'
                     for e_=1:size(events_,2)
                         evts_ = events_{t_,e_};
+                        if isempty(evts_)
+                            continue
+                        end%if
                         select_ = true(size(evts_,1),1);
                         for k_=1:size(evts_,1)
                             select_(k_) = evts_{k_,1}(feature_) == value_;
@@ -980,6 +1008,8 @@ function events_=apply_filters(filters_, events_, trials_, groups_, behavior_des
             end%for
         end%if
     end%for
+    discard = any(cellfun(@isempty,events_),2);
+    [events_{find(discard),:}] = deal(cell(0,2));
 end%function
 
 end%function
