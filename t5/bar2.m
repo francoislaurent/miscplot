@@ -157,7 +157,7 @@ if ~isempty(legend)
     lg_y = yl(1) + .9 * (yl(2)-yl(1));
     switch lower(legendlocation)
     case {'topleft' 'left'}
-        lg_x = xl(1)+(x_+lg_text_width);%min(x(:))
+        lg_x = xl(1)+(x_+.5*lg_text_width);%min(x(:))
     case {'topmiddle' 'middle'}
         lg_x = mean(x(:))+(x_ - mean(x_));
     case {'topright' 'right'}

@@ -11,6 +11,7 @@ wd = pwd();
 cd('../data')
 dirs = ls('-d */');
 %dirs = ['11F06/';'27B12/';'30E06/';'65B04/';'85F12/']
+dirs = ls('-d T5_plots/ethograms/*/')
 cd(wd)
 
 for d = 1:size(dirs,1)
@@ -33,6 +34,8 @@ for d = 1:size(dirs,1)
     xlabel('Time from stimulus onset (s)')
     ylabel('Number of animals')
 
-    print('-depsc', [dir_(1:end-1),'.eps'])
+    larva = dir_(1:end-1);
+    larva = strsplit(larva, '/'){end};
+    print('-depsc', [larva,'_ethogram.eps'])
     close
 end%for d
