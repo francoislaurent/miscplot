@@ -1,4 +1,6 @@
 
+Fig = 5
+
 behaviors = {'hunch_large_squares', 'blue'; ...
     'cast_large_squares',   'red'; ...
     'back_large_squares',   'cyan'; ...
@@ -37,5 +39,14 @@ m = ethogram1(ethogram, ...
 xlabel('Time from stimulus onset (s)')
 ylabel('Number of animals')
 
-print('-depsc', 'control1.eps')
+%print('-depsc', 'control1.eps')
+if Fig == 4
+print('-dpng', '-r600', '-F:24', 'control1.png')
 close
+elseif Fig == 5
+file = 'control-small1.png';
+print('-dpng', '-r300', '-F:30', file)
+close
+system(['convert ', file, ' -transparent white ', file]);
+end%if
+

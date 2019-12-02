@@ -22,6 +22,7 @@ function varargout=bar2(y, varargin)
 %   'LineWidth': array of floats
 %   'Legend': cell array of strings (as many entries as bars in a group)
 %   'LegendLocation': any of 'TopLeft', 'TopMiddle', 'TopRight'
+%   'LegendLayout': any of 'Horizontal' (default), 'Vertical'
 %   'LegendWidth': relative width of the squares in the legend
 %   'LegendTextWidth': relative width of the space dedicated to text
 %       in the legend
@@ -44,9 +45,11 @@ edgealpha = 1;
 linewidth = .5;
 legend = {};
 legendlocation = 'topright';
+legendlayout = 'horizontal';
 lg_relative_width = .5;
 lg_relative_text_width = 3;
 lg_font_size = [];
+lg_horizontal_margin = '';
 for a = firstarg:2:nargin-1
     switch lower(varargin{a})
     case 'interval'
@@ -65,12 +68,16 @@ for a = firstarg:2:nargin-1
         legend = varargin{a+1};
     case 'legendlocation'
         legendlocation = varargin{a+1};
+    case 'legendlayout'
+        legendlayout = varargin{a+1};
     case 'legendwidth'
         lg_relative_width = varargin{a+1};
     case 'legendtextwidth'
         lg_relative_text_width = varargin{a+1};
     case 'legendfontsize'
         lg_font_size = varargin{a+1};
+    case 'legendhorizontalmargin'
+        lg_horizontal_margin = varargin{a+1};
     end%switch
 end%for
 if ~iscell(facecolor)
@@ -82,6 +89,13 @@ end%if
 text_prop = {'VerticalAlignment', 'baseline'};
 if ~isempty(lg_font_size)
     text_prop = [text_prop, {'FontSize', lg_font_size}];
+end%if
+if isempty(lg_horizontal_margin)
+    if ~isempty(strfind(lower(legendlocation), 'left'))
+        lg_horizontal_margin = .5;
+    elseif ~isempty(strfind(lower(legendlocation), 'right'))
+        lg_horizontal_margin = 1;
+    end%if
 end%if
 
 sz = size(y);
@@ -152,45 +166,55 @@ if ~isempty(legend)
     lg_width = width * lg_relative_width;
     lg_height = lg_width * aspect_ratio;
     x_ = [0:lg_width:lg_width*(m-1)+eps, lg_width*(m+.2)];
-    w_ = lg_width * m + lg_text_width;
-    x_ = repmat(x_, 1, n) + reshape(repmat(0:w_:w_*(n-1)+eps, m+1, 1), 1, (m+1)*n);
-    lg_y = yl(1) + .9 * (yl(2)-yl(1));
+    y_ = yl(1) + .9 * (yl(2)-yl(1));
+    y_ = repmat(y_, 1, (m+1) * n);
+    if strcmpi(legendlayout, 'horizontal')
+        w_ = lg_width * m + lg_text_width;
+        x_ = repmat(x_, 1, n) + reshape(repmat(0:w_:w_*(n-1)+eps, m+1, 1), 1, (m+1)*n);
+    elseif strcmpi(legendlayout, 'vertical')
+        x_ = repmat(x_, 1, n);
+        h_ = lg_height * m;
+        y_ = y_ - reshape(repmat(0:h_:h_*(n-1)+eps, m+1, 1), 1, (m+1)*n);
+    else
+        error(['unexpected legend layout: ' legendlayout])
+    end%if
+    lg_y = y_;
     switch lower(legendlocation)
     case {'topleft' 'left'}
-        lg_x = xl(1)+(x_+.5*lg_text_width);%min(x(:))
+        lg_x = xl(1)+(x_+lg_horizontal_margin*lg_text_width);%min(x(:))
     case {'topmiddle' 'middle'}
         lg_x = mean(x(:))+(x_ - mean(x_));
     case {'topright' 'right'}
-        lg_x = xl(2)+(x_-x_(end)-lg_text_width);%max(x(:))
+        lg_x = xl(2)+(x_-x_(end)-lg_horizontal_margin*lg_text_width);%max(x(:))
     otherwise
         error(['unexpected legend location: ', legendlocation])
     end%switch
-    y_ = lg_y + lg_height * [0 0 1 1];
     k = 0;
     for i = 1:n
         for j = 1:m
             k = k + 1;
             x_ = lg_x(k);
+            y_ = lg_y(k);
             if draw_area
-                area_h(end+1) = patch(x_ + lg_width * [0 1 1 0], y_, 'k', ...
+                area_h(end+1) = patch(x_ + lg_width * [0 1 1 0], y_ + lg_height * [0 0 1 1], 'k', ...
                     'FaceColor', facecolor{i,j}, 'EdgeColor', 'none', 'FaceAlpha', facealpha(i,j));
             end%if
             if j == 1
                 x__ = x_ + lg_width * [1 0 0 1];
-                y__ = y_;
+                y__ = y_ + lg_height * [0 0 1 1];
             elseif j == m
                 x__ = x_ + lg_width * [0 1 1 0];
-                y__ = y_;
+                y__ = y_ + lg_height * [0 0 1 1];
             else
                 x__ = [x_+lg_width, x_, nan, x_, x_+lg_width];
-                y__ = [lg_y, lg_y, nan, lg_y+lg_height, lg_y+lg_height];
+                y__ = [y_, y_, nan, y_+lg_height, y_+lg_height];
             end%if
             if draw_line
                 line_h(end+1) = plot(x__, y__, '-', 'Color', edgecolor{i,j}, 'LineWidth', linewidth(i,j));
             end%if
         end%for
         k = k + 1;
-        text_h(end+1) = text(lg_x(k), lg_y, legend{i}, text_prop{:});
+        text_h(end+1) = text(lg_x(k), lg_y(k), legend{i}, text_prop{:});
     end%for
 end%if
 
